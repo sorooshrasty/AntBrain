@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Slide 6 skin dipole geometry viewer</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f5f7fb;
+      color: #20242a;
+    }
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 22px;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 16px;
+      align-items: center;
+      margin: 10px 0 14px;
+      font-size: 14px;
+    }
+    button {
+      border: 1px solid #c7cfdd;
+      background: white;
+      color: #20242a;
+      border-radius: 8px;
+      padding: 7px 10px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #eef3fb;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 700px;
+      background: linear-gradient(180deg, #ffffff 0%, #eef2f8 100%);
+      border: 1px solid #d9dee8;
+      border-radius: 14px;
+      box-shadow: 0 8px 28px rgba(20, 31, 50, 0.08);
+      cursor: grab;
+    }
+    canvas:active {
+      cursor: grabbing;
+    }
+    .notes {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    .note {
+      background: #ffffff;
+      border: 1px solid #d9dee8;
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+    .swatch {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      margin-right: 6px;
+      vertical-align: -1px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h2>Slide 6 geometry review: corrected dipole on skin</h2>
+    <p>
+      Drag to rotate. Scroll to zoom. This is the geometry used by
+      <code>verify_slide6_skin_zwidth_edgefeed.py</code>; thin PEC sheets are
+      drawn with small visual thickness so you can see the feed and port.
+    </p>
+
+    <div class="toolbar">
+      <label><input id="showSkin" type="checkbox" checked /> show skin block</label>
+      <label><input id="showDims" type="checkbox" checked /> show labels</label>
+      <button id="resetView">Reset view</button>
+    </div>
+
+    <canvas id="viewer"></canvas>
+
+    <div class="notes">
+      <div class="note"><span class="swatch" style="background:#caa1d2"></span>Skin block: 175 × 35 × 45 mm, y = 0 to +35 mm.</div>
+      <div class="note"><span class="swatch" style="background:#d99655"></span>Dipole arms: 165 mm total x-length, 4 mm z-width, located on y = 0 skin surface.</div>
+      <div class="note"><span class="swatch" style="background:#a86f45"></span>Parallel feed sheets: x = ±1 mm, y = -35 to 0 mm, z-width = 4 mm.</div>
+      <div class="note"><span class="swatch" style="background:#e34b4b"></span>50 Ω lumped port: x = -1 to +1 mm at y = -35 mm, spanning z = ±2 mm.</div>
+    </div>
+  </main>
+
+  <script>
+    const canvas = document.getElementById("viewer");
+    const ctx = canvas.getContext("2d");
+    const showSkinInput = document.getElementById("showSkin");
+    const showDimsInput = document.getElementById("showDims");
+    const resetButton = document.getElementById("resetView");
+
+    const VISUAL_SHEET_T = 0.25; // mm, only for visibility in this viewer
+
+    const objects = [
+      {
+        name: "skin block",
+        kind: "skin",
+        x0: -87.5, x1: 87.5,
+        y0: 0.0, y1: 35.0,
+        z0: -22.5, z1: 22.5,
+        color: "#caa1d2",
+        alpha: 0.34
+      },
+      {
+        name: "left dipole arm",
+        kind: "metal",
+        x0: -82.5, x1: -1.0,
+        y0: -VISUAL_SHEET_T / 2, y1: VISUAL_SHEET_T / 2,
+        z0: -2.0, z1: 2.0,
+        color: "#d99655",
+        alpha: 1.0
+      },
+      {
+        name: "right dipole arm",
+        kind: "metal",
+        x0: 1.0, x1: 82.5,
+        y0: -VISUAL_SHEET_T / 2, y1: VISUAL_SHEET_T / 2,
+        z0: -2.0, z1: 2.0,
+        color: "#d99655",
+        alpha: 1.0
+      },
+      {
+        name: "left feed sheet",
+        kind: "metal",
+        x0: -1.0 - VISUAL_SHEET_T / 2, x1: -1.0 + VISUAL_SHEET_T / 2,
+        y0: -35.0, y1: 0.0,
+        z0: -2.0, z1: 2.0,
+        color: "#a86f45",
+        alpha: 1.0
+      },
+      {
+        name: "right feed sheet",
+        kind: "metal",
+        x0: 1.0 - VISUAL_SHEET_T / 2, x1: 1.0 + VISUAL_SHEET_T / 2,
+        y0: -35.0, y1: 0.0,
+        z0: -2.0, z1: 2.0,
+        color: "#a86f45",
+        alpha: 1.0
+      },
+      {
+        name: "50 ohm lumped port",
+        kind: "port",
+        x0: -1.0, x1: 1.0,
+        y0: -35.0 - VISUAL_SHEET_T / 2, y1: -35.0 + VISUAL_SHEET_T / 2,
+        z0: -2.0, z1: 2.0,
+        color: "#e34b4b",
+        alpha: 1.0
+      }
+    ];
+
+    const faces = [
+      [0, 1, 2, 3], [4, 7, 6, 5],
+      [0, 4, 5, 1], [3, 2, 6, 7],
+      [0, 3, 7, 4], [1, 5, 6, 2]
+    ];
+
+    let yaw = -0.72;
+    let pitch = 0.48;
+    let zoom = 1.0;
+    let dragging = false;
+    let last = {x: 0, y: 0};
+
+    function resetView() {
+      yaw = -0.72;
+      pitch = 0.48;
+      zoom = 1.0;
+      draw();
+    }
+
+    function resize() {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.round(rect.width * dpr);
+      canvas.height = Math.round(rect.height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw();
+    }
+
+    function vertices(b) {
+      return [
+        [b.x0, b.y0, b.z0], [b.x1, b.y0, b.z0], [b.x1, b.y1, b.z0], [b.x0, b.y1, b.z0],
+        [b.x0, b.y0, b.z1], [b.x1, b.y0, b.z1], [b.x1, b.y1, b.z1], [b.x0, b.y1, b.z1]
+      ];
+    }
+
+    function rgb(hex) {
+      const n = parseInt(hex.slice(1), 16);
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    }
+
+    function shade(hex, factor, alpha = 1) {
+      const [r0, g0, b0] = rgb(hex);
+      const r = Math.max(0, Math.min(255, Math.round(r0 * factor)));
+      const g = Math.max(0, Math.min(255, Math.round(g0 * factor)));
+      const b = Math.max(0, Math.min(255, Math.round(b0 * factor)));
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
+    function transform(p) {
+      const cx = 0, cy = 0, cz = 0;
+      let x = p[0] - cx;
+      let y = p[1] - cy;
+      let z = p[2] - cz;
+
+      const cyaw = Math.cos(yaw), syaw = Math.sin(yaw);
+      const x1 = x * cyaw - y * syaw;
+      const y1 = x * syaw + y * cyaw;
+
+      const cp = Math.cos(pitch), sp = Math.sin(pitch);
+      const y2 = y1 * cp - z * sp;
+      const z2 = y1 * sp + z * cp;
+
+      return {x: x1, y: y2, z: z2};
+    }
+
+    function project(t, scale, w, h) {
+      return {
+        x: w / 2 + t.x * scale,
+        y: h / 2 - t.z * scale,
+        depth: t.y
+      };
+    }
+
+    function label3d(text, point, scale, w, h, color = "#20242a") {
+      const p = project(transform(point), scale, w, h);
+      ctx.fillStyle = color;
+      ctx.font = "13px Arial";
+      ctx.fillText(text, p.x + 6, p.y - 6);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawAxes(scale, w, h) {
+      const origin = project(transform([0, 0, 0]), scale, w, h);
+      const axes = [
+        {p: [26, 0, 0], label: "x", color: "#2c64b7"},
+        {p: [0, 26, 0], label: "y", color: "#248b45"},
+        {p: [0, 0, 16], label: "z", color: "#b73535"}
+      ];
+      ctx.lineWidth = 2;
+      ctx.font = "13px Arial";
+      for (const a of axes) {
+        const end = project(transform(a.p), scale, w, h);
+        ctx.strokeStyle = a.color;
+        ctx.fillStyle = a.color;
+        ctx.beginPath();
+        ctx.moveTo(origin.x, origin.y);
+        ctx.lineTo(end.x, end.y);
+        ctx.stroke();
+        ctx.fillText(a.label, end.x + 5, end.y - 5);
+      }
+    }
+
+    function draw() {
+      const rect = canvas.getBoundingClientRect();
+      const w = rect.width;
+      const h = rect.height;
+      ctx.clearRect(0, 0, w, h);
+
+      const scale = Math.min(w / 220, h / 125) * 0.96 * zoom;
+      const renderFaces = [];
+
+      for (const obj of objects) {
+        if (obj.kind === "skin" && !showSkinInput.checked) continue;
+        const tv = vertices(obj).map(transform);
+        const pv = tv.map(v => project(v, scale, w, h));
+        for (let i = 0; i < faces.length; i++) {
+          const f = faces[i];
+          const depth = f.reduce((sum, idx) => sum + tv[idx].y, 0) / f.length;
+          renderFaces.push({obj, f, pv, depth, faceIndex: i});
+        }
+      }
+
+      renderFaces.sort((a, b) => a.depth - b.depth);
+
+      for (const item of renderFaces) {
+        const pts = item.f.map(idx => item.pv[idx]);
+        const factor = [0.78, 1.05, 0.90, 0.82, 0.70, 0.96][item.faceIndex];
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+        ctx.closePath();
+        ctx.fillStyle = shade(item.obj.color, factor, item.obj.alpha);
+        ctx.strokeStyle = item.obj.kind === "skin" ? "rgba(60, 40, 65, 0.35)" : "rgba(20, 20, 25, 0.72)";
+        ctx.lineWidth = item.obj.kind === "skin" ? 0.9 : 1.1;
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      drawAxes(scale, w, h);
+
+      if (showDimsInput.checked) {
+        label3d("skin: 175 × 35 × 45 mm", [-87.5, 35, 22.5], scale, w, h, "#7f5289");
+        label3d("dipole length 165 mm", [0, -0.6, 3.4], scale, w, h, "#9b5a1f");
+        label3d("4 mm width in z", [43, -0.6, 2], scale, w, h, "#9b5a1f");
+        label3d("feed sheets y=-35..0 mm", [4.5, -18, 3.6], scale, w, h, "#7a4a30");
+        label3d("50 Ω port at x=0, y=-35", [0, -35, -3.0], scale, w, h, "#c02d2d");
+      }
+
+      ctx.fillStyle = "#20242a";
+      ctx.font = "15px Arial";
+      ctx.fillText("Slide 6: corrected dipole on tabulated skin", 18, 28);
+      ctx.font = "13px Arial";
+      ctx.fillStyle = "#5a6070";
+      ctx.fillText("Skin is y=0..+35 mm; feed extends outward to y=-35 mm. Thin PEC sheets are visually thickened only.", 18, 50);
+    }
+
+    canvas.addEventListener("pointerdown", e => {
+      dragging = true;
+      last = {x: e.clientX, y: e.clientY};
+      canvas.setPointerCapture(e.pointerId);
+    });
+    canvas.addEventListener("pointermove", e => {
+      if (!dragging) return;
+      yaw += (e.clientX - last.x) * 0.008;
+      pitch += (e.clientY - last.y) * 0.008;
+      pitch = Math.max(-1.35, Math.min(1.35, pitch));
+      last = {x: e.clientX, y: e.clientY};
+      draw();
+    });
+    canvas.addEventListener("pointerup", () => dragging = false);
+    canvas.addEventListener("pointercancel", () => dragging = false);
+    canvas.addEventListener("wheel", e => {
+      e.preventDefault();
+      zoom *= e.deltaY > 0 ? 0.92 : 1.08;
+      zoom = Math.max(0.25, Math.min(6, zoom));
+      draw();
+    }, {passive: false});
+
+    showSkinInput.addEventListener("change", draw);
+    showDimsInput.addEventListener("change", draw);
+    resetButton.addEventListener("click", resetView);
+    window.addEventListener("resize", resize);
+    resize();
+  </script>
+</body>
+</html>
