@@ -1,0 +1,6 @@
+vertical_port_variant,s11_db_at_650MHz,n_tets,n_dofs
+xz_gap_at_slot_substrate,-12.273549561927926,6018,38716
+xz_full_at_slot_substrate,-2.37985979378082,6312,40580
+xz_full_at_feedbottom_substrate,-20.512818195210386,6157,39602
+xz_gap_at_slot_airplus_sub,-12.171122190676995,6133,39448
+xz_full_at_slot_airplus_sub,-2.2051754168395448,6417,41246

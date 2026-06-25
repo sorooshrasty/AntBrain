@@ -1,0 +1,13 @@
+material,feed_variant,substrate_er,substrate_tand,substrate_thickness_mm,s11_db_at_650MHz,n_tets,n_dofs
+Rogers_6010_assumed,central_slot_gap,10.2,0.0023,1.27,-0.09483364741335558,4806,31052
+Rogers_6010_assumed,old_full_width_full_height,10.2,0.0023,1.27,-3.211406977935136,4909,31710
+Rogers_6010_assumed,upper_throat_bridge_best_so_far,10.2,0.0023,1.27,-9.306254858666854,4878,31516
+FR4_typical,central_slot_gap,4.4,0.02,1.6,-0.04206010591367727,4904,31680
+FR4_typical,old_full_width_full_height,4.4,0.02,1.6,-3.2077971465062705,5026,32458
+FR4_typical,upper_throat_bridge_best_so_far,4.4,0.02,1.6,-9.309125126666776,4997,32278
+air_spacer_er1,central_slot_gap,1.0,0.0,1.27,-0.002697546645110528,4806,31052
+air_spacer_er1,old_full_width_full_height,1.0,0.0,1.27,-3.2004740174924535,4909,31710
+air_spacer_er1,upper_throat_bridge_best_so_far,1.0,0.0,1.27,-9.302805279022902,4878,31516
+loaded_er40_4mm,central_slot_gap,40.0,0.0,4.0,-0.6779165762244077,4993,32252
+loaded_er40_4mm,old_full_width_full_height,40.0,0.0,4.0,-3.119526939570092,5098,32924
+loaded_er40_4mm,upper_throat_bridge_best_so_far,40.0,0.0,4.0,-9.150044531123893,5048,32612

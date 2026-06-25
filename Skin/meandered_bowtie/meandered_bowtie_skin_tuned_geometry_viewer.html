@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Meandered Bowtie tuned skin geometry viewer</title>
+  <style>
+    body { margin:0; background:#f5f7fb; color:#1f2937; font-family:Arial,Helvetica,sans-serif; }
+    main { max-width:1240px; margin:0 auto; padding:22px; }
+    h2 { margin:0 0 6px; }
+    p { line-height:1.42; }
+    canvas {
+      width:100%; height:760px; display:block; background:linear-gradient(#fff,#edf2f8);
+      border:1px solid #d5dce8; border-radius:14px; box-shadow:0 8px 30px rgba(20,31,50,.08);
+      cursor:grab;
+    }
+    canvas:active { cursor:grabbing; }
+    .toolbar { display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; margin:12px 0 14px; font-size:14px; }
+    button { border:1px solid #c8d0dd; background:#fff; border-radius:8px; padding:7px 10px; cursor:pointer; }
+    button:hover { background:#eef3fb; }
+    .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(235px,1fr)); gap:10px; margin-top:14px; }
+    .card { background:#fff; border:1px solid #d8deea; border-radius:10px; padding:10px 12px; font-size:14px; line-height:1.38; }
+    .sw { display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:6px; vertical-align:-1px; }
+    code { background:#eef2f7; padding:1px 4px; border-radius:4px; }
+  </style>
+</head>
+<body>
+<main>
+  <h2>Meandered Bowtie on skin — tuned Slide-12 geometry</h2>
+  <p>
+    Drag to rotate in 3D mode. Turn on <b>2D ruler mode</b> and click two points to measure top-view distance in millimeters.
+    The red vertical sheet is the tuned CPW-style lumped port used in the latest simulation.
+  </p>
+  <div class="toolbar">
+    <label><input id="showAir" type="checkbox" checked /> air box</label>
+    <label><input id="showSkin" type="checkbox" checked /> skin block</label>
+    <label><input id="showRogers" type="checkbox" checked /> Rogers board</label>
+    <label><input id="showSide" type="checkbox" checked /> side metal</label>
+    <label><input id="showMain" type="checkbox" checked /> main metal</label>
+    <label><input id="showPort" type="checkbox" checked /> tuned feed port</label>
+    <label><input id="showLabels" type="checkbox" checked /> labels</label>
+    <label><input id="rulerMode" type="checkbox" /> 2D ruler mode</label>
+    <button id="clearRuler">Clear ruler</button>
+    <button id="isoView">Iso view</button>
+    <button id="topView">Top view</button>
+    <button id="resetView">Reset view</button>
+  </div>
+  <canvas id="viewer"></canvas>
+  <div class="cards">
+    <div class="card"><span class="sw" style="background:#8bb7ff"></span>Air box: simulation boundary/ABC region.</div>
+    <div class="card"><span class="sw" style="background:#d59adf"></span>Skin: tabulated <code>skin_Er.tab</code> and <code>skin_cond.tab</code>, 20 mm thick.</div>
+    <div class="card"><span class="sw" style="background:#aaa"></span>Rogers board: 42 × 38.5 mm, thickness 1.27 mm, Er=10.2 assumption.</div>
+    <div class="card"><span class="sw" style="background:#d99655"></span>Orange: PEC metal regions from DXF interpretation.</div>
+    <div class="card"><span class="sw" style="background:#e23b3b"></span>Tuned feed: vertical x-z port, x=-0.8925…+0.8925 mm, y=1.45 mm, Zref=10 Ω, height override=0.62 mm.</div>
+  </div>
+</main>
+
+<script>
+const DATA = {"dxf_name":"Meandered_Bowtie_v1.0.dxf","unit":"mm","rogers":{"layer":"ROGERS RT-DUROID 6010LM (LOSSY)","points":[[-21.0,-8.75],[21.0,-8.75],[21.0,29.75],[-21.0,29.75]],"bbox":[-21.0,-8.75,21.0,29.75],"area":1617.0},"main_metal":{"layer":"PEC","points":[[19.028618,-4.009091],[13.526965,0.572727],[19.472727,0.572727],[19.472727,2.1],[11.693081,2.1],[6.191428,6.681818],[19.472727,6.681818],[19.472727,8.209091],[4.357544,8.209091],[2.647658,9.633096],[2.647658,11.366904],[4.357544,12.790909],[19.472727,12.790909],[19.472727,14.318182],[6.191428,14.318182],[11.693081,18.9],[19.472727,18.9],[19.472727,20.427273],[13.526965,20.427273],[19.028618,25.009091],[19.472727,25.009091],[19.472727,27.3],[0.3,11.332808],[0.3,1.75],[-0.3,1.75],[-0.3,11.332808],[-19.472727,27.3],[-19.472727,25.009091],[-19.028618,25.009091],[-13.526965,20.427273],[-19.472727,20.427273],[-19.472727,18.9],[-11.693081,18.9],[-6.191428,14.318182],[-19.472727,14.318182],[-19.472727,12.790909],[-4.357544,12.790909],[-2.647658,11.366904],[-2.647658,9.633096],[-4.357544,8.209091],[-19.472727,8.209091],[-19.472727,6.681818],[-6.191428,6.681818],[-11.693081,2.1],[-19.472727,2.1],[-19.472727,0.572727],[-13.526965,0.572727],[-19.028618,-4.009091],[-19.472727,-4.009091],[-19.472727,-6.3],[-0.8925,9.173754],[-0.8925,0.8575],[0.8925,0.8575],[0.8925,9.173754],[19.472727,-6.3],[19.472727,-4.009091]],"bbox":[-19.472727,-6.3,19.472727,27.3],"area":-285.9623205742582},"gray_region":{"layer":"PEC","points":[[21.0,-8.75],[21.0,-2.481818],[19.581299,-2.481818],[17.747415,-0.954545],[21.0,-0.954545],[21.0,3.627273],[12.245762,3.627273],[10.411878,5.154545],[21.0,5.154545],[21.0,9.736364],[4.910225,9.736364],[4.174931,10.348722],[4.174931,10.651278],[4.910225,11.263636],[21.0,11.263636],[21.0,15.845455],[10.411878,15.845455],[12.245762,17.372727],[21.0,17.372727],[21.0,21.954545],[17.747415,21.954545],[19.581299,23.481818],[21.0,23.481818],[21.0,29.75],[-21.0,29.75],[-21.0,23.481818],[-19.581299,23.481818],[-17.747415,21.954545],[-21.0,21.954545],[-21.0,17.372727],[-12.245762,17.372727],[-10.411878,15.845455],[-21.0,15.845455],[-21.0,11.263636],[-4.910225,11.263636],[-4.174931,10.651278],[-4.174931,10.348722],[-4.910225,9.736364],[-21.0,9.736364],[-21.0,5.154545],[-10.411878,5.154545],[-12.245762,3.627273],[-21.0,3.627273],[-21.0,-0.954545],[-17.747415,-0.954545],[-19.581299,-2.481818],[-21.0,-2.481818],[-21.0,-8.75]],"bbox":[-21.0,-8.75,21.0,29.75],"area":1493.1568651129721},"side_metal":{"outer":{"layer":"ROGERS RT-DUROID 6010LM (LOSSY)","points":[[-21.0,-8.75],[21.0,-8.75],[21.0,29.75],[-21.0,29.75]],"bbox":[-21.0,-8.75,21.0,29.75],"area":1617.0},"holes":[{"layer":"PEC","points":[[21.0,-8.75],[21.0,-2.481818],[19.581299,-2.481818],[17.747415,-0.954545],[21.0,-0.954545],[21.0,3.627273],[12.245762,3.627273],[10.411878,5.154545],[21.0,5.154545],[21.0,9.736364],[4.910225,9.736364],[4.174931,10.348722],[4.174931,10.651278],[4.910225,11.263636],[21.0,11.263636],[21.0,15.845455],[10.411878,15.845455],[12.245762,17.372727],[21.0,17.372727],[21.0,21.954545],[17.747415,21.954545],[19.581299,23.481818],[21.0,23.481818],[21.0,29.75],[-21.0,29.75],[-21.0,23.481818],[-19.581299,23.481818],[-17.747415,21.954545],[-21.0,21.954545],[-21.0,17.372727],[-12.245762,17.372727],[-10.411878,15.845455],[-21.0,15.845455],[-21.0,11.263636],[-4.910225,11.263636],[-4.174931,10.651278],[-4.174931,10.348722],[-4.910225,9.736364],[-21.0,9.736364],[-21.0,5.154545],[-10.411878,5.154545],[-12.245762,3.627273],[-21.0,3.627273],[-21.0,-0.954545],[-17.747415,-0.954545],[-19.581299,-2.481818],[-21.0,-2.481818],[-21.0,-8.75]],"bbox":[-21.0,-8.75,21.0,29.75],"area":1493.1568651129721}]},"port":{"name":"tuned Slide-12 vertical CPW lumped port","x0":-0.8925,"x1":0.8925,"y":1.45,"z0":-1.27,"z1":0.0,"zref_ohm":10.0,"height_override_mm":0.62,"maxh_mm":0.5},"stack":{"board":{"xmin":-21.0,"ymin":-8.75,"xmax":21.0,"ymax":29.75,"z0":-1.27,"z1":0.0},"skin":{"xmin":-33.0,"ymin":-20.75,"xmax":33.0,"ymax":41.75,"z0":-21.27,"z1":-1.27},"air":{"xmin":-46.0,"ymin":-33.75,"xmax":46.0,"ymax":54.75,"z0":-31.27,"z1":35.0}}};
+const canvas = document.getElementById("viewer");
+const ctx = canvas.getContext("2d");
+const ui = {
+  air: document.getElementById("showAir"),
+  skin: document.getElementById("showSkin"),
+  rogers: document.getElementById("showRogers"),
+  side: document.getElementById("showSide"),
+  main: document.getElementById("showMain"),
+  port: document.getElementById("showPort"),
+  labels: document.getElementById("showLabels"),
+  ruler: document.getElementById("rulerMode"),
+};
+
+let yaw = -0.62, pitch = 0.42, zoom = 1.0, dragging = false, last = {x:0,y:0}, rulerPts = [];
+const board = DATA.stack.board, skin = DATA.stack.skin, air = DATA.stack.air, port = DATA.port;
+const cx = (air.xmin + air.xmax) / 2, cy = (air.ymin + air.ymax) / 2, cz = (air.z0 + air.z1) / 2;
+
+function resize() {
+  const r = canvas.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.round(r.width * dpr); canvas.height = Math.round(r.height * dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0); draw();
+}
+function tr3(p) {
+  let x = p[0] - cx, y = p[1] - cy, z = p[2] - cz;
+  const cyw = Math.cos(yaw), syw = Math.sin(yaw);
+  const x1 = x * cyw - y * syw, y1 = x * syw + y * cyw;
+  const cp = Math.cos(pitch), sp = Math.sin(pitch);
+  return {x:x1, y:y1*cp - z*sp, z:y1*sp + z*cp};
+}
+function pr(t,s,w,h) { return {x:w/2 + t.x*s, y:h/2 - t.z*s}; }
+function allScale3(w,h) {
+  return Math.min(w / ((air.xmax-air.xmin)*1.65), h / ((air.ymax-air.ymin + air.z1-air.z0)*1.2)) * zoom;
+}
+function scale2(w,h) { return Math.min(w/(air.xmax-air.xmin+8), h/(air.ymax-air.ymin+8)); }
+function w2s(p,w,h) { const s=scale2(w,h); return {x:w/2+(p[0]-cx)*s, y:h/2-(p[1]-cy)*s}; }
+function s2w(x,y,w,h) { const s=scale2(w,h); return [cx+(x-w/2)/s, cy-(y-h/2)/s]; }
+
+function boxVerts(b) {
+  return [[b.xmin,b.ymin,b.z0],[b.xmax,b.ymin,b.z0],[b.xmax,b.ymax,b.z0],[b.xmin,b.ymax,b.z0],
+          [b.xmin,b.ymin,b.z1],[b.xmax,b.ymin,b.z1],[b.xmax,b.ymax,b.z1],[b.xmin,b.ymax,b.z1]];
+}
+function drawBox(b, style, s,w,h, fillTop=false) {
+  const v = boxVerts(b).map(p => pr(tr3(p),s,w,h));
+  const edges = [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+  if (fillTop) {
+    ctx.beginPath(); ctx.moveTo(v[4].x,v[4].y); [5,6,7].forEach(i=>ctx.lineTo(v[i].x,v[i].y)); ctx.closePath();
+    ctx.fillStyle = style.fill; ctx.fill();
+  }
+  ctx.strokeStyle = style.stroke; ctx.lineWidth = style.lineWidth || 1.2;
+  for (const [a,b2] of edges) { ctx.beginPath(); ctx.moveTo(v[a].x,v[a].y); ctx.lineTo(v[b2].x,v[b2].y); ctx.stroke(); }
+}
+function path3(points,s,w,h,z,holes=[]) {
+  const pts = points.map(p => pr(tr3([p[0],p[1],z]),s,w,h));
+  ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y); for (let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x,pts[i].y); ctx.closePath();
+  for (const hole of holes) {
+    const hp = hole.map(p => pr(tr3([p[0],p[1],z]),s,w,h));
+    if (!hp.length) continue; ctx.moveTo(hp[0].x,hp[0].y); for (let i=1;i<hp.length;i++) ctx.lineTo(hp[i].x,hp[i].y); ctx.closePath();
+  }
+}
+function drawPoly3(points, style, s,w,h,z=0, holes=[]) {
+  path3(points,s,w,h,z,holes);
+  ctx.fillStyle = style.fill; ctx.strokeStyle = style.stroke; ctx.lineWidth = style.lineWidth || 1;
+  holes.length ? ctx.fill("evenodd") : ctx.fill(); ctx.stroke();
+}
+function drawPort3(s,w,h) {
+  const pts = [[port.x0,port.y,port.z0],[port.x1,port.y,port.z0],[port.x1,port.y,port.z1],[port.x0,port.y,port.z1]];
+  const sp = pts.map(p => pr(tr3(p),s,w,h));
+  ctx.beginPath(); ctx.moveTo(sp[0].x,sp[0].y); for (let i=1;i<sp.length;i++) ctx.lineTo(sp[i].x,sp[i].y); ctx.closePath();
+  ctx.fillStyle="rgba(226,59,59,.82)"; ctx.strokeStyle="#8b1010"; ctx.lineWidth=1.5; ctx.fill(); ctx.stroke();
+}
+
+function path2(points,w,h,holes=[]) {
+  const pts = points.map(p => w2s(p,w,h));
+  ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y); for (let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x,pts[i].y); ctx.closePath();
+  for (const hole of holes) {
+    const hp = hole.map(p => w2s(p,w,h));
+    if (!hp.length) continue; ctx.moveTo(hp[0].x,hp[0].y); for (let i=1;i<hp.length;i++) ctx.lineTo(hp[i].x,hp[i].y); ctx.closePath();
+  }
+}
+function drawPoly2(points, style, w,h,holes=[]) {
+  path2(points,w,h,holes); ctx.fillStyle=style.fill; ctx.strokeStyle=style.stroke; ctx.lineWidth=style.lineWidth || 1;
+  holes.length ? ctx.fill("evenodd") : ctx.fill(); ctx.stroke();
+}
+function drawRect2(b,style,w,h) {
+  drawPoly2([[b.xmin,b.ymin],[b.xmax,b.ymin],[b.xmax,b.ymax],[b.xmin,b.ymax]], style, w,h);
+}
+function drawGrid(w,h) {
+  ctx.strokeStyle="rgba(100,110,130,.20)"; ctx.fillStyle="#667085"; ctx.font="11px Arial";
+  for (let x=Math.ceil(air.xmin/10)*10; x<=air.xmax; x+=10) {
+    const a=w2s([x,air.ymin],w,h), b=w2s([x,air.ymax],w,h);
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); ctx.fillText(`${x}`,a.x+2,h-10);
+  }
+  for (let y=Math.ceil(air.ymin/10)*10; y<=air.ymax; y+=10) {
+    const a=w2s([air.xmin,y],w,h), b=w2s([air.xmax,y],w,h);
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); ctx.fillText(`${y}`,10,a.y-2);
+  }
+}
+function drawPort2(w,h) {
+  const a=w2s([port.x0,port.y],w,h), b=w2s([port.x1,port.y],w,h), c=w2s([(port.x0+port.x1)/2,port.y],w,h);
+  ctx.strokeStyle="#d61f1f"; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+  ctx.fillStyle="#d61f1f"; ctx.beginPath(); ctx.arc(c.x,c.y,5,0,Math.PI*2); ctx.fill();
+}
+function label(text,p,w,h,color) {
+  if (!ui.labels.checked) return;
+  const q = w2s(p,w,h); ctx.fillStyle=color; ctx.font="13px Arial"; ctx.fillText(text,q.x+6,q.y-6);
+}
+function drawRuler(w,h) {
+  if (!rulerPts.length) return;
+  const pts = rulerPts.map(p => w2s(p,w,h));
+  ctx.fillStyle="#111827"; ctx.strokeStyle="#111827"; ctx.lineWidth=2;
+  for (const p of pts) { ctx.beginPath(); ctx.arc(p.x,p.y,4,0,Math.PI*2); ctx.fill(); }
+  if (pts.length === 2) {
+    ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y); ctx.lineTo(pts[1].x,pts[1].y); ctx.stroke();
+    const dx=rulerPts[1][0]-rulerPts[0][0], dy=rulerPts[1][1]-rulerPts[0][1], d=Math.hypot(dx,dy);
+    const mx=(pts[0].x+pts[1].x)/2, my=(pts[0].y+pts[1].y)/2;
+    ctx.fillStyle="rgba(255,255,255,.95)"; ctx.strokeStyle="rgba(30,41,59,.35)"; ctx.fillRect(mx+8,my-42,196,56); ctx.strokeRect(mx+8,my-42,196,56);
+    ctx.fillStyle="#111827"; ctx.font="13px Arial"; ctx.fillText(`distance = ${d.toFixed(3)} mm`,mx+16,my-24); ctx.fillText(`dx=${dx.toFixed(3)}, dy=${dy.toFixed(3)} mm`,mx+16,my-7);
+  }
+}
+function draw2D(w,h) {
+  drawGrid(w,h);
+  if (ui.air.checked) drawRect2(air,{fill:"rgba(139,183,255,.08)",stroke:"rgba(67,125,210,.55)",lineWidth:1.2},w,h);
+  if (ui.skin.checked) drawRect2(skin,{fill:"rgba(213,154,223,.20)",stroke:"rgba(142,74,155,.70)",lineWidth:1.2},w,h);
+  if (ui.rogers.checked) drawRect2(board,{fill:"rgba(160,160,160,.36)",stroke:"rgba(60,60,60,.75)"},w,h);
+  if (ui.side.checked) drawPoly2(DATA.side_metal.outer.points,{fill:"rgba(154,106,53,.86)",stroke:"rgba(55,35,15,.88)"},w,h,DATA.side_metal.holes.map(h=>h.points));
+  if (ui.main.checked) drawPoly2(DATA.main_metal.points,{fill:"rgba(217,150,85,.95)",stroke:"rgba(35,25,20,.88)"},w,h);
+  if (ui.port.checked) drawPort2(w,h);
+  label("skin block",[skin.xmin,skin.ymax],w,h,"#944aa0"); label("Rogers board",[board.xmin,board.ymax],w,h,"#555");
+  label("tuned vertical port",[(port.x0+port.x1)/2,port.y],w,h,"#c02d2d"); label("main metal",[0,10.5],w,h,"#8a4b16");
+  drawRuler(w,h);
+  ctx.fillStyle="#20242a"; ctx.font="15px Arial"; ctx.fillText("Top view / ruler mode: dimensions in mm",18,28);
+}
+function draw3D(w,h) {
+  const s = allScale3(w,h);
+  if (ui.air.checked) drawBox(air,{stroke:"rgba(67,125,210,.55)"},s,w,h,false);
+  if (ui.skin.checked) drawBox(skin,{fill:"rgba(213,154,223,.18)",stroke:"rgba(142,74,155,.80)"},s,w,h,true);
+  if (ui.rogers.checked) drawBox(board,{fill:"rgba(160,160,160,.34)",stroke:"rgba(70,70,70,.78)"},s,w,h,true);
+  if (ui.side.checked) drawPoly3(DATA.side_metal.outer.points,{fill:"rgba(154,106,53,.86)",stroke:"rgba(55,35,15,.88)"},s,w,h,0.05,DATA.side_metal.holes.map(h=>h.points));
+  if (ui.main.checked) drawPoly3(DATA.main_metal.points,{fill:"rgba(217,150,85,.96)",stroke:"rgba(35,25,20,.9)"},s,w,h,0.12);
+  if (ui.port.checked) drawPort3(s,w,h);
+  ctx.fillStyle="#20242a"; ctx.font="15px Arial"; ctx.fillText("3D geometry: tuned vertical CPW port + Rogers + skin block",18,28);
+}
+function draw() {
+  const r=canvas.getBoundingClientRect(), w=r.width, h=r.height; ctx.clearRect(0,0,w,h);
+  ui.ruler.checked ? draw2D(w,h) : draw3D(w,h);
+}
+canvas.addEventListener("pointerdown", e => {
+  const r=canvas.getBoundingClientRect();
+  if (ui.ruler.checked) {
+    if (rulerPts.length >= 2) rulerPts = [];
+    rulerPts.push(s2w(e.clientX-r.left,e.clientY-r.top,r.width,r.height)); draw(); return;
+  }
+  dragging=true; last={x:e.clientX,y:e.clientY}; canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener("pointermove", e => {
+  if (!dragging || ui.ruler.checked) return;
+  yaw += (e.clientX-last.x)*0.008; pitch += (e.clientY-last.y)*0.008; pitch = Math.max(-1.35, Math.min(1.35, pitch));
+  last={x:e.clientX,y:e.clientY}; draw();
+});
+canvas.addEventListener("pointerup",()=>dragging=false); canvas.addEventListener("pointercancel",()=>dragging=false);
+canvas.addEventListener("wheel", e => { e.preventDefault(); zoom *= e.deltaY > 0 ? .92 : 1.08; zoom = Math.max(.25, Math.min(8, zoom)); draw(); }, {passive:false});
+for (const el of Object.values(ui)) el.addEventListener("change", draw);
+document.getElementById("clearRuler").addEventListener("click",()=>{rulerPts=[]; draw();});
+document.getElementById("isoView").addEventListener("click",()=>{ui.ruler.checked=false; yaw=-0.62; pitch=0.42; zoom=1; draw();});
+document.getElementById("topView").addEventListener("click",()=>{ui.ruler.checked=true; rulerPts=[]; draw();});
+document.getElementById("resetView").addEventListener("click",()=>{ui.ruler.checked=false; rulerPts=[]; yaw=-0.62; pitch=0.42; zoom=1; draw();});
+window.addEventListener("resize",resize); resize();
+</script>
+</body>
+</html>
