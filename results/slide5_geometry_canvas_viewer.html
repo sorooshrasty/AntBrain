@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Slide 5 dipole geometry - canvas fallback viewer</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f5f7fb;
+      color: #20242a;
+    }
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 22px;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 690px;
+      background: linear-gradient(180deg, #ffffff 0%, #eef2f8 100%);
+      border: 1px solid #d9dee8;
+      border-radius: 14px;
+      box-shadow: 0 8px 28px rgba(20, 31, 50, 0.08);
+      cursor: grab;
+    }
+    canvas:active {
+      cursor: grabbing;
+    }
+    .notes {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    .note {
+      background: #ffffff;
+      border: 1px solid #d9dee8;
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h2>Slide 5 dipole geometry review - fallback viewer</h2>
+    <p>Drag to rotate. Scroll to zoom. This page is standalone and does not need localhost, internet, or RapidFEM JS.</p>
+    <canvas id="viewer"></canvas>
+    <div class="notes">
+      <div class="note">Dipole arms: 165 mm total length along x.</div>
+      <div class="note">Conductor width: 4 mm along z.</div>
+      <div class="note">Conductor thickness: 0.2 mm along y.</div>
+      <div class="note">Feed point: x = 0 mm, y = -35 mm, edge-connected between the two feed strips.</div>
+      <div class="note">Two feed strips: parallel, 0.5 mm x-width each, separated by 2 mm center gap.</div>
+    </div>
+  </main>
+
+  <script>
+    const canvas = document.getElementById("viewer");
+    const ctx = canvas.getContext("2d");
+
+    const boxes = [
+      {name: "left arm", x0: -82.5, x1: -1.0, y0: -0.1, y1: 0.1, z0: -2.0, z1: 2.0, color: "#d99655"},
+      {name: "right arm", x0: 1.0, x1: 82.5, y0: -0.1, y1: 0.1, z0: -2.0, z1: 2.0, color: "#d99655"},
+      {name: "left feed metal", x0: -1.5, x1: -1.0, y0: -35.0, y1: 0.0, z0: -2.0, z1: 2.0, color: "#a86f45"},
+      {name: "right feed metal", x0: 1.0, x1: 1.5, y0: -35.0, y1: 0.0, z0: -2.0, z1: 2.0, color: "#a86f45"},
+      {name: "50 ohm port visual", x0: -1.0, x1: 1.0, y0: -35.125, y1: -34.875, z0: -2.0, z1: 2.0, color: "#e34b4b"}
+    ];
+
+    const faces = [
+      [0, 1, 2, 3], [4, 7, 6, 5],
+      [0, 4, 5, 1], [3, 2, 6, 7],
+      [0, 3, 7, 4], [1, 5, 6, 2]
+    ];
+
+    let yaw = -0.58;
+    let pitch = 0.62;
+    let zoom = 1.0;
+    let dragging = false;
+    let last = {x: 0, y: 0};
+
+    function resize() {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.round(rect.width * dpr);
+      canvas.height = Math.round(rect.height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw();
+    }
+
+    function boxVertices(b) {
+      return [
+        [b.x0, b.y0, b.z0], [b.x1, b.y0, b.z0], [b.x1, b.y1, b.z0], [b.x0, b.y1, b.z0],
+        [b.x0, b.y0, b.z1], [b.x1, b.y0, b.z1], [b.x1, b.y1, b.z1], [b.x0, b.y1, b.z1]
+      ];
+    }
+
+    function shade(hex, factor) {
+      const n = parseInt(hex.slice(1), 16);
+      const r = Math.max(0, Math.min(255, Math.round(((n >> 16) & 255) * factor)));
+      const g = Math.max(0, Math.min(255, Math.round(((n >> 8) & 255) * factor)));
+      const b = Math.max(0, Math.min(255, Math.round((n & 255) * factor)));
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+
+    function transform(p) {
+      const cx = 0, cy = -17.5, cz = 0;
+      let x = p[0] - cx;
+      let y = p[1] - cy;
+      let z = p[2] - cz;
+
+      const cyaw = Math.cos(yaw), syaw = Math.sin(yaw);
+      const x1 = x * cyaw - y * syaw;
+      const y1 = x * syaw + y * cyaw;
+
+      const cp = Math.cos(pitch), sp = Math.sin(pitch);
+      const y2 = y1 * cp - z * sp;
+      const z2 = y1 * sp + z * cp;
+
+      return {x: x1, y: y2, z: z2};
+    }
+
+    function project(t, scale, w, h) {
+      return {
+        x: w / 2 + t.x * scale,
+        y: h / 2 - t.z * scale,
+        depth: t.y
+      };
+    }
+
+    function drawAxes(scale, w, h) {
+      const origin = project(transform([0, -17.5, 0]), scale, w, h);
+      const axes = [
+        {p: [25, -17.5, 0], label: "x", color: "#2c64b7"},
+        {p: [0, 7.5, 0], label: "y", color: "#248b45"},
+        {p: [0, -17.5, 8], label: "z", color: "#b73535"}
+      ];
+      ctx.lineWidth = 2;
+      ctx.font = "13px Arial";
+      for (const a of axes) {
+        const end = project(transform(a.p), scale, w, h);
+        ctx.strokeStyle = a.color;
+        ctx.fillStyle = a.color;
+        ctx.beginPath();
+        ctx.moveTo(origin.x, origin.y);
+        ctx.lineTo(end.x, end.y);
+        ctx.stroke();
+        ctx.fillText(a.label, end.x + 5, end.y - 5);
+      }
+    }
+
+    function draw() {
+      const rect = canvas.getBoundingClientRect();
+      const w = rect.width;
+      const h = rect.height;
+      ctx.clearRect(0, 0, w, h);
+
+      const scale = Math.min(w / 190, h / 75) * 0.92 * zoom;
+      const renderFaces = [];
+
+      for (const b of boxes) {
+        const tv = boxVertices(b).map(transform);
+        const pv = tv.map(v => project(v, scale, w, h));
+        for (let i = 0; i < faces.length; i++) {
+          const f = faces[i];
+          const depth = f.reduce((sum, idx) => sum + tv[idx].y, 0) / f.length;
+          renderFaces.push({b, f, pv, depth, faceIndex: i});
+        }
+      }
+
+      renderFaces.sort((a, b) => a.depth - b.depth);
+
+      for (const item of renderFaces) {
+        const pts = item.f.map(idx => item.pv[idx]);
+        const factor = [0.78, 1.05, 0.90, 0.82, 0.70, 0.96][item.faceIndex];
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+        ctx.closePath();
+        ctx.fillStyle = shade(item.b.color, factor);
+        ctx.strokeStyle = "rgba(20, 20, 25, 0.65)";
+        ctx.lineWidth = 1;
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      drawAxes(scale, w, h);
+
+      ctx.fillStyle = "#20242a";
+      ctx.font = "15px Arial";
+      ctx.fillText("Slide 5 finite-thickness geometry", 18, 28);
+      ctx.font = "13px Arial";
+      ctx.fillStyle = "#5a6070";
+      ctx.fillText("Orange = metal, red = 50 Ω lumped-port visual at x=0, y=-35 mm", 18, 50);
+    }
+
+    canvas.addEventListener("pointerdown", e => {
+      dragging = true;
+      last = {x: e.clientX, y: e.clientY};
+      canvas.setPointerCapture(e.pointerId);
+    });
+    canvas.addEventListener("pointermove", e => {
+      if (!dragging) return;
+      yaw += (e.clientX - last.x) * 0.008;
+      pitch += (e.clientY - last.y) * 0.008;
+      pitch = Math.max(-1.35, Math.min(1.35, pitch));
+      last = {x: e.clientX, y: e.clientY};
+      draw();
+    });
+    canvas.addEventListener("pointerup", () => dragging = false);
+    canvas.addEventListener("wheel", e => {
+      e.preventDefault();
+      zoom *= e.deltaY > 0 ? 0.92 : 1.08;
+      zoom = Math.max(0.35, Math.min(5, zoom));
+      draw();
+    }, {passive: false});
+
+    window.addEventListener("resize", resize);
+    resize();
+  </script>
+</body>
+</html>
